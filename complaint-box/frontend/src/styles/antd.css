@@ -1,0 +1,164 @@
+/*
+  Ant Design Override Styles
+  Custom Ant Design component styling for Civic Complaint Box
+*/
+
+/* Form Labels */
+.ant-form-item-label > label {
+  font-weight: 500 !important;
+  color: #333333 !important;
+}
+
+.ant-form-item-label > label::after {
+  color: #ff4d4f;
+}
+
+/* Buttons */
+.ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
+  border-color: #5568d3;
+}
+
+/* Cards */
+.ant-card {
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.ant-card-head {
+  border-bottom: 2px solid #f0f0f0;
+  background: #fafafa;
+}
+
+/* Selects */
+.ant-select-selector {
+  border-color: #d9d9d9 !important;
+}
+
+.ant-select-focused .ant-select-selector {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* Input */
+.ant-input,
+.ant-input-number,
+.ant-mentions {
+  border-color: #d9d9d9;
+}
+
+.ant-input:focus,
+.ant-input-number-focused,
+.ant-mentions-focused {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* Tags */
+.ant-tag {
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* Table */
+.ant-table {
+  background-color: #fff;
+}
+
+.ant-table-thead > tr > th {
+  background-color: #fafafa;
+  font-weight: 600;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #f5f5f5;
+}
+
+/* Modal */
+.ant-modal-header {
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.ant-modal-footer {
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Message / Notification */
+.ant-message-notice-content {
+  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12);
+}
+
+/* Tree / Checkbox */
+.ant-tree-checkbox-checked {
+  color: #667eea;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #667eea;
+  border-color: #667eea;
+}
+
+/* Pagination */
+.ant-pagination-item-active {
+  border-color: #667eea;
+}
+
+.ant-pagination-item-active a {
+  color: #667eea;
+}
+
+.ant-pagination-item:hover a {
+  color: #667eea;
+}
+
+/* Upload */
+.ant-upload.ant-upload-drag {
+  border-color: #d9d9d9;
+}
+
+.ant-upload.ant-upload-drag:hover {
+  border-color: #667eea;
+  background-color: #f5f7ff;
+}
+
+/* Rate */
+.ant-rate-star:hover,
+.ant-rate-star-focused {
+  color: #ffc069;
+}
+
+/* Spin */
+.ant-spin-blur {
+  opacity: 0.5;
+}
+
+.ant-spin-spinning {
+  position: relative;
+}
+
+/* Tooltip */
+.ant-tooltip-inner {
+  background-color: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12);
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .ant-btn {
+    font-size: 14px;
+  }
+
+  .ant-form-item {
+    margin-bottom: 18px;
+  }
+
+  .ant-card {
+    margin-bottom: 12px;
+  }
+}

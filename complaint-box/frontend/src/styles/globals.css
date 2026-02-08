@@ -1,0 +1,97 @@
+/*
+  Global Styles for Civic Complaint Box dApp
+  Tailwind CSS base styles and custom component styles
+*/
+
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom Styles */
+body {
+  @apply bg-gray-50 font-sans;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Complaint Card Animations */
+.complaint-card {
+  transition: all 0.3s ease;
+}
+
+.complaint-card:hover {
+  @apply shadow-lg;
+}
+
+/* Button Styles */
+.ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+.ant-btn-primary:hover {
+  background-color: #0050b3;
+  border-color: #0050b3;
+}
+
+/* Filter Sidebar */
+.filter-card {
+  position: sticky;
+  top: 100px;
+}
+
+/* Form Styles */
+.complaint-form .ant-form-item-label > label {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Loader */
+.loading-spinner {
+  @apply flex justify-center items-center py-8;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filter-card {
+    position: static;
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* Wallet Connection Button */
+.ant-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Success Message */
+.ant-message-success {
+  margin-top: 1rem;
+}
+
+/* Tag Colors */
+.ant-tag-orange {
+  background-color: #fff7e6;
+  border-color: #ffd591;
+  color: #d46b08;
+}
+
+.ant-tag-blue {
+  background-color: #e6f7ff;
+  border-color: #91d5ff;
+  color: #0050b3;
+}
+
+.ant-tag-green {
+  background-color: #f6ffed;
+  border-color: #b7eb8f;
+  color: #274101;
+}
+
+.ant-tag-red {
+  background-color: #fff1f0;
+  border-color: #ffccc7;
+  color: #a4000f;
+}

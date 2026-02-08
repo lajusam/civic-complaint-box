@@ -1,0 +1,11 @@
+{
+  "name": "complaint-contract",
+  "version": "0.28.0",
+  "description": "Solana Anchor Program for Civic Complaint Box",
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/complaint-box"
+  }
+}
