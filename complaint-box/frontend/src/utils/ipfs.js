@@ -102,6 +102,12 @@ export const getComplaintFromIPFS = async (ipfsHash) => {
  */
 export const uploadImageToIPFS = async (imageFile) => {
   try {
+    // Validate that we received a proper File/Blob
+    if (!imageFile || !(imageFile instanceof Blob)) {
+      console.error('uploadImageToIPFS: invalid file argument', imageFile);
+      return `QmImage${Date.now().toString(36)}${Math.random().toString(36).substring(7)}`;
+    }
+
     // Return mock hash if credentials not configured or are placeholder values
     if (!hasValidCredentials()) {
       console.warn('IPFS credentials not configured, using local preview for demo');
@@ -112,7 +118,7 @@ export const uploadImageToIPFS = async (imageFile) => {
     formData.append('file', imageFile);
 
     const metadata = {
-      name: imageFile.name,
+      name: imageFile.name || `image-${Date.now()}`,
       keyvalues: {
         type: 'complaint-image',
       },
@@ -123,6 +129,7 @@ export const uploadImageToIPFS = async (imageFile) => {
       headers: {
         pinata_api_key: IPFS_API_KEY,
         pinata_secret_api_key: IPFS_API_SECRET,
+        // Do NOT set Content-Type manually — let the browser set it with the boundary
       },
       timeout: 30000,
     };

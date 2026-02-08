@@ -20,6 +20,10 @@ import { uploadComplaintToIPFS, uploadImageToIPFS } from '../utils/ipfs';
 import { COMPLAINT_CATEGORIES, IPFS_GATEWAY } from '../utils/constants';
 import { useLanguage } from '../context/LanguageContext';
 
+// Allowed image MIME types
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+const MAX_IMAGE_SIZE_MB = 5;
+
 const CATEGORY_ICONS = {
   infrastructure: '🏗️',
   safety: '🛡️',
@@ -77,21 +81,31 @@ const ComplaintForm = ({ onComplaintCreated }) => {
 
     setLoading(true);
     try {
+      // Build image hashes and IPFS-based URLs (not blob URLs, which expire)
+      const imageHashes = uploadedImages.map(img => img.hash);
+      const imageUrls = uploadedImages.map(img => `${IPFS_GATEWAY}${img.hash}`);
+
       const complaintData = {
         title: allValues.title.trim(),
         description: (allValues.description || '').trim(),
         category: allValues.category,
         location: allValues.location.trim(),
-        images: uploadedImages.map(img => img.hash),
-        imageUrls: uploadedImages.map(img => img.previewUrl || `${IPFS_GATEWAY}${img.hash}`),
+        images: imageHashes,
+        imageUrls: imageUrls,
         author: publicKey.toString(),
         createdAt: new Date().toISOString(),
       };
 
       const ipfsHash = await uploadComplaintToIPFS(complaintData);
 
+      if (!ipfsHash) {
+        throw new Error('Failed to get IPFS hash for complaint data');
+      }
+
       const result = {
         ...complaintData,
+        // Keep local preview URLs for immediate display in success screen
+        imagePreviewUrls: uploadedImages.map(img => img.previewUrl).filter(Boolean),
         ipfsHash,
         txHash: `${Date.now().toString(36)}...${Math.random().toString(36).slice(2, 6)}`,
       };
@@ -106,21 +120,31 @@ const ComplaintForm = ({ onComplaintCreated }) => {
 
     } catch (error) {
       console.error('Error creating complaint:', error);
-      message.error(t('submitFailed'));
+      const errorMsg = error?.message || '';
+      if (errorMsg.includes('IPFS') || errorMsg.includes('Pinata')) {
+        message.error('Failed to upload complaint to IPFS. Please try again.');
+      } else if (errorMsg.includes('image') || errorMsg.includes('Image')) {
+        message.error('Image upload error. Please remove the image and try again.');
+      } else {
+        message.error(t('submitFailed'));
+      }
     } finally {
       setLoading(false);
     }
   }, [publicKey, uploadedImages, onComplaintCreated, currentStep, form, t]);
 
   const beforeUpload = useCallback((file) => {
-    const isValidType = file.type.startsWith('image/');
+    // Validate file type — only jpg, jpeg, png
+    const isValidType = ALLOWED_IMAGE_TYPES.includes(file.type);
     if (!isValidType) {
-      message.error(t('imageOnlyError'));
+      message.error('Only JPG, JPEG, and PNG images are allowed.');
       return Upload.LIST_IGNORE;
     }
-    const isLt5M = file.size / 1024 / 1024 < 5;
-    if (!isLt5M) {
-      message.error(t('imageSizeError'));
+
+    // Validate file size
+    const isUnderLimit = file.size / 1024 / 1024 < MAX_IMAGE_SIZE_MB;
+    if (!isUnderLimit) {
+      message.error(`Image must be smaller than ${MAX_IMAGE_SIZE_MB}MB.`);
       return Upload.LIST_IGNORE;
     }
 
@@ -128,19 +152,29 @@ const ComplaintForm = ({ onComplaintCreated }) => {
     setImageUploading(true);
     uploadImageToIPFS(file)
       .then((imageHash) => {
-        const previewUrl = URL.createObjectURL(file);
+        if (!imageHash) {
+          throw new Error('No hash returned from IPFS upload');
+        }
+        let previewUrl = null;
+        try {
+          previewUrl = URL.createObjectURL(file);
+        } catch (e) {
+          console.warn('Could not create preview URL:', e);
+        }
         setUploadedImages(prev => [...prev, { hash: imageHash, previewUrl }]);
-        message.success(`${file.name} ${t('uploadSuccess')}`);
+        message.success(`${file.name} uploaded successfully`);
       })
-      .catch(() => {
-        message.error(t('imageUploadFailed'));
+      .catch((err) => {
+        console.error('Image upload failed:', err);
+        message.error(`Failed to upload ${file.name}. Please try again.`);
       })
       .finally(() => {
         setImageUploading(false);
       });
 
+    // Return false to prevent antd's default upload behavior
     return false;
-  }, [t]);
+  }, []);
 
   const nextStep = useCallback(async () => {
     try {
@@ -370,9 +404,12 @@ const ComplaintForm = ({ onComplaintCreated }) => {
           <Form.Item label={t('uploadEvidence')}>
             <Upload.Dragger
               beforeUpload={beforeUpload}
-              customRequest={() => {}}
+              customRequest={({ onSuccess }) => {
+                // Properly signal success to antd to prevent stuck upload state
+                setTimeout(() => onSuccess('ok'), 0);
+              }}
               multiple
-              accept="image/*"
+              accept=".jpg,.jpeg,.png"
               disabled={imageUploading}
               showUploadList={false}
               fileList={[]}

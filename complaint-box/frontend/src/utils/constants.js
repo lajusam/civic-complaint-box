@@ -71,5 +71,8 @@ export const isAdminWallet = (walletAddress) => {
 // Transaction confirmation timeout (in ms)
 export const TX_CONFIRMATION_TIMEOUT = 30000;
 
+// Backend API URL (set via env or default to localhost)
+export const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000';
+
 // Pagination
 export const ITEMS_PER_PAGE = 10;

@@ -1,4 +1,9 @@
 {
+  "name": "civic-complaint-box-root",
+  "private": true,
+  "scripts": {
+    "build": "cd complaint-box/frontend && npm run build"
+  },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
