@@ -10,7 +10,9 @@ const PINATA_ENDPOINT = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
  * Check if Pinata credentials are configured
  */
 const hasValidCredentials = () => {
-  return IPFS_API_KEY && IPFS_API_KEY !== 'demo_key' && IPFS_API_SECRET && IPFS_API_SECRET !== 'demo_secret';
+  if (!IPFS_API_KEY || !IPFS_API_SECRET) return false;
+  const placeholders = ['demo_key', 'demo_secret', 'test_key_replace_with_real', 'test_secret_replace_with_real', 'your_api_key', 'your_api_secret', ''];
+  return !placeholders.includes(IPFS_API_KEY) && !placeholders.includes(IPFS_API_SECRET);
 };
 
 /**
@@ -100,10 +102,10 @@ export const getComplaintFromIPFS = async (ipfsHash) => {
  */
 export const uploadImageToIPFS = async (imageFile) => {
   try {
-    // Return mock hash if credentials not configured
+    // Return mock hash if credentials not configured or are placeholder values
     if (!hasValidCredentials()) {
-      console.warn('IPFS credentials not configured, using mock hash for demo');
-      return `QmImage${Math.random().toString(36).substring(7)}`;
+      console.warn('IPFS credentials not configured, using local preview for demo');
+      return `QmImage${Date.now().toString(36)}${Math.random().toString(36).substring(7)}`;
     }
 
     const formData = new FormData();
@@ -122,13 +124,14 @@ export const uploadImageToIPFS = async (imageFile) => {
         pinata_api_key: IPFS_API_KEY,
         pinata_secret_api_key: IPFS_API_SECRET,
       },
+      timeout: 30000,
     };
 
     const response = await axios.post(PINATA_ENDPOINT, formData, config);
     return response.data.IpfsHash;
   } catch (error) {
-    console.error('Error uploading image to IPFS:', error);
-    // Return mock hash on error
-    return `QmImage${Math.random().toString(36).substring(7)}`;
+    console.warn('IPFS upload failed, using local preview:', error.message);
+    // Return mock hash on error — image will still show via local blob URL
+    return `QmImage${Date.now().toString(36)}${Math.random().toString(36).substring(7)}`;
   }
 };

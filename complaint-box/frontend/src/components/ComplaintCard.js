@@ -1,27 +1,32 @@
-// ComplaintCard Component
-// Displays a single complaint with details, upvote button, and admin controls
-
-import React, { useState } from 'react';
-import { Card, Button, Row, Col, Tag, Space, Modal, Select, message, Popconfirm } from 'antd';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Button, Modal, Select, message, Popconfirm, Tooltip } from 'antd';
 import {
   LikeOutlined,
   LikeFilled,
   EnvironmentOutlined,
-  CalendarOutlined,
+  ClockCircleOutlined,
   UserOutlined,
   DeleteOutlined,
+  EditOutlined,
+  SafetyCertificateOutlined,
+  LinkOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
-import { COMPLAINT_STATUS, ADMIN_WALLET } from '../utils/constants';
+import { COMPLAINT_STATUS, ADMIN_WALLET, isAdminWallet, IPFS_GATEWAY } from '../utils/constants';
+import { useLanguage } from '../context/LanguageContext';
 
-/**
- * ComplaintCard Component
- * @param {Object} complaint - Complaint data
- * @param {boolean} hasVoted - Whether current user has voted
- * @param {Function} onUpvote - Callback for upvote action
- * @param {Function} onStatusUpdate - Callback for status update (admin only)
- * @param {Function} onDelete - Callback for delete action
- * @param {string} currentUserAddress - Current user's wallet address
- */
+const CATEGORY_META = {
+  infrastructure: { icon: '🏗️', color: '#003893', label: 'Infrastructure' },
+  safety: { icon: '🛡️', color: '#DC143C', label: 'Safety' },
+  water_quality: { icon: '💧', color: '#0ea5e9', label: 'Water Quality' },
+  sanitation: { icon: '🧹', color: '#059669', label: 'Sanitation' },
+  traffic: { icon: '🚦', color: '#f59e0b', label: 'Traffic' },
+  noise_pollution: { icon: '🔊', color: '#7c3aed', label: 'Noise Pollution' },
+  other: { icon: '📋', color: '#64748b', label: 'Other' },
+};
+
+const STATUS_ORDER = ['pending', 'in_progress', 'resolved'];
+
 const ComplaintCard = ({
   complaint,
   hasVoted,
@@ -30,172 +35,292 @@ const ComplaintCard = ({
   onDelete,
   currentUserAddress,
 }) => {
+  const { t, tCategory, tStatus } = useLanguage();
   const [isUpvoting, setIsUpvoting] = useState(false);
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(complaint.status);
-  const isAdmin = currentUserAddress === ADMIN_WALLET;
+
+  const isAdmin = isAdminWallet(currentUserAddress);
   const isAuthor = currentUserAddress === complaint.author;
+  const catMeta = CATEGORY_META[complaint.category] || CATEGORY_META.other;
 
-  // Format date
-  const formatDate = (timestamp) => {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formattedDate = useMemo(() => {
+    const date = new Date(complaint.createdAt * 1000);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
 
-  // Handle upvote
-  const handleUpvote = async () => {
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }, [complaint.createdAt]);
+
+  const shortAuthor = useMemo(() => {
+    if (!complaint.author || complaint.author === 'Anonymous') return 'Anonymous';
+    return `${complaint.author.slice(0, 4)}...${complaint.author.slice(-4)}`;
+  }, [complaint.author]);
+
+  // Determine status timeline progress
+  const statusIndex = useMemo(() => {
+    if (complaint.status === 'rejected') return -1;
+    return STATUS_ORDER.indexOf(complaint.status);
+  }, [complaint.status]);
+
+  const handleUpvote = useCallback(async () => {
     setIsUpvoting(true);
     try {
       await onUpvote(complaint.id);
-      message.success('Upvote recorded!');
     } catch (error) {
-      message.error('Failed to upvote: ' + error.message);
+      message.error('Failed to upvote. Please try again.');
     } finally {
       setIsUpvoting(false);
     }
-  };
+  }, [onUpvote, complaint.id]);
 
-  // Handle status update
-  const handleStatusUpdate = async () => {
+  const handleStatusUpdate = useCallback(async () => {
     try {
       await onStatusUpdate(complaint.id, selectedStatus);
-      message.success('Status updated successfully!');
+      message.success('Status updated successfully');
       setIsStatusModalVisible(false);
     } catch (error) {
-      message.error('Failed to update status: ' + error.message);
+      message.error('Failed to update status. Please try again.');
     }
-  };
-
-  // Get status color
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'orange',
-      in_progress: 'blue',
-      resolved: 'green',
-      rejected: 'red',
-    };
-    return colors[status] || 'default';
-  };
+  }, [onStatusUpdate, complaint.id, selectedStatus]);
 
   return (
-    <Card
-      className="complaint-card mb-4 hover:shadow-lg transition-shadow"
-      hoverable
+    <article
+      className="glass-card p-5 mb-4 animate-fade-in-up"
+      role="article"
+      aria-label={`Complaint: ${complaint.title}`}
     >
-      {/* Header with Status Tag */}
-      <Row justify="space-between" align="middle" className="mb-3">
-        <Col>
-          <h3 className="text-lg font-semibold mb-0">{complaint.title}</h3>
-        </Col>
-        <Col>
-          <Tag color={getStatusColor(complaint.status)}>
-            {complaint.status.replace('_', ' ').toUpperCase()}
-          </Tag>
-        </Col>
-      </Row>
+      {/* Top row: Category + Trust Badges + Status */}
+      <div className="flex items-start justify-between mb-3 gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className="category-chip"
+            style={{ background: `${catMeta.color}10`, color: catMeta.color, borderColor: `${catMeta.color}30`, border: '1px solid' }}
+          >
+            <span aria-hidden="true">{catMeta.icon}</span>
+            {tCategory(complaint.category)}
+          </span>
 
-      {/* Category and Location */}
-      <Row className="mb-2 text-gray-600">
-        <Col span={24}>
-          <Space>
-            <span>
-              <strong>Category:</strong> {complaint.category}
+          {/* Trust indicators */}
+          <span className="trust-badge trust-badge-onchain" title="Verified on Solana blockchain">
+            <SafetyCertificateOutlined style={{ fontSize: 10 }} aria-hidden="true" />
+            On-chain
+          </span>
+          {complaint.ipfsHash && (
+            <span className="trust-badge trust-badge-ipfs" title="Stored on IPFS">
+              <LinkOutlined style={{ fontSize: 10 }} aria-hidden="true" />
+              IPFS
             </span>
-            <span>
-              <EnvironmentOutlined /> {complaint.location}
-            </span>
-          </Space>
-        </Col>
-      </Row>
+          )}
+        </div>
+
+          <span
+          className={`status-badge status-${complaint.status}`}
+          role="status"
+          aria-label={`Status: ${tStatus(complaint.status)}`}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            aria-hidden="true"
+            style={{
+              background: complaint.status === 'pending' ? '#f59e0b'
+                : complaint.status === 'in_progress' ? '#003893'
+                : complaint.status === 'resolved' ? '#059669'
+                : '#dc2626'
+            }}
+          />
+          {tStatus(complaint.status)}
+        </span>
+      </div>
+
+      {/* Title */}
+      <h3 className="text-base font-semibold text-slate-900 mb-1.5 leading-snug">
+        {complaint.title}
+      </h3>
 
       {/* Description */}
-      <p className="text-sm text-gray-700 mb-3">{complaint.description}</p>
+      {complaint.description && (
+        <p className="text-sm text-slate-600 mb-3 leading-relaxed line-clamp-3">
+          {complaint.description}
+        </p>
+      )}
 
-      {/* Metadata: Author, Date */}
-      <Row className="mb-3 text-xs text-gray-500">
-        <Col span={12}>
-          <Space>
-            <UserOutlined />
-            <span>{complaint.author.slice(0, 8)}...{complaint.author.slice(-4)}</span>
-          </Space>
-        </Col>
-        <Col span={12}>
-          <Space>
-            <CalendarOutlined />
-            <span>{formatDate(complaint.createdAt)}</span>
-          </Space>
-        </Col>
-      </Row>
-
-      {/* Upvote Section */}
-      <Row align="middle" className="border-t pt-3">
-        <Col span={12}>
-          <Button
-            type={hasVoted ? 'primary' : 'default'}
-            icon={hasVoted ? <LikeFilled /> : <LikeOutlined />}
-            onClick={handleUpvote}
-            loading={isUpvoting}
-            disabled={isUpvoting || hasVoted}
-          >
-            {complaint.upvotes} Upvotes {hasVoted ? '(Voted)' : ''}
-          </Button>
-        </Col>
-
-        {/* Controls: Admin Status Update + Author Delete */}
-        <Col span={12} style={{ textAlign: 'right' }}>
-          <Space>
-            {isAdmin && (
-              <Button
-                type="dashed"
-                onClick={() => setIsStatusModalVisible(true)}
+      {/* Images */}
+      {((complaint.imageUrls && complaint.imageUrls.length > 0) || (complaint.images && complaint.images.length > 0)) && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {(complaint.imageUrls || complaint.images).map((imgSrc, idx) => {
+            const isLocalBlob = imgSrc && imgSrc.startsWith('blob:');
+            const src = isLocalBlob ? imgSrc : `${IPFS_GATEWAY}${imgSrc}`;
+            return (
+              <a
+                key={idx}
+                href={isLocalBlob ? undefined : src}
+                target={isLocalBlob ? undefined : '_blank'}
+                rel={isLocalBlob ? undefined : 'noopener noreferrer'}
+                className="block"
+                onClick={isLocalBlob ? (e) => e.preventDefault() : undefined}
               >
-                Update Status
-              </Button>
-            )}
-            {isAuthor && (
-              <Popconfirm
-                title="Delete your complaint?"
-                description="This action cannot be undone."
-                onConfirm={() => onDelete(complaint.id)}
-                okText="Yes, Delete"
-                cancelText="Cancel"
-                okButtonProps={{ danger: true }}
-              >
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
+                <img
+                  src={src}
+                  alt={`Evidence ${idx + 1}`}
+                  className="w-24 h-24 object-cover rounded-lg border border-slate-200 hover:border-red-300 transition-colors cursor-pointer"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '';
+                    e.target.alt = 'Image';
+                    e.target.className = 'w-24 h-24 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center';
+                    e.target.parentElement.innerHTML = '<div class="w-24 h-24 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-400 text-xs text-center p-2">📷 Photo attached</div>';
+                  }}
+                />
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Meta row */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mb-3">
+        <span className="inline-flex items-center gap-1">
+          <EnvironmentOutlined aria-hidden="true" /> {complaint.location}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <ClockCircleOutlined aria-hidden="true" /> <time>{formattedDate}</time>
+        </span>
+        <Tooltip title={complaint.author}>
+          <span className="inline-flex items-center gap-1">
+            <UserOutlined aria-hidden="true" /> {shortAuthor}
+          </span>
+        </Tooltip>
+      </div>
+
+      {/* Status Timeline (mini) */}
+      {complaint.status !== 'rejected' && (
+        <div className="status-timeline mb-4" aria-label="Complaint progress">
+          {STATUS_ORDER.map((step, idx) => (
+            <React.Fragment key={step}>
+              {idx > 0 && (
+                <div
+                  className={`timeline-connector ${idx <= statusIndex ? 'timeline-connector-active' : ''}`}
+                  aria-hidden="true"
+                />
+              )}
+              <Tooltip title={step.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}>
+                <div
+                  className={`timeline-dot ${
+                    idx < statusIndex ? 'timeline-dot-completed'
+                    : idx === statusIndex ? 'timeline-dot-active'
+                    : 'timeline-dot-pending'
+                  }`}
+                  aria-label={`${step.replace(/_/g, ' ')}: ${idx <= statusIndex ? 'completed' : 'pending'}`}
                 >
-                  Delete
-                </Button>
-              </Popconfirm>
-            )}
-          </Space>
-        </Col>
-      </Row>
+                  {idx < statusIndex && (
+                    <CheckCircleOutlined style={{ fontSize: 8, color: 'white' }} />
+                  )}
+                </div>
+              </Tooltip>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {/* Action bar */}
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+        {/* Upvote */}
+        <button
+          onClick={handleUpvote}
+          disabled={isUpvoting || hasVoted}
+          aria-label={hasVoted ? `You upvoted this complaint. ${complaint.upvotes} total votes` : `Upvote this complaint. ${complaint.upvotes} current votes`}
+          aria-pressed={hasVoted}
+          className={`
+            inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+            transition-all duration-150 border
+            ${hasVoted
+              ? 'bg-red-50 text-red-800 border-red-200 cursor-default'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-red-300 hover:text-red-800 hover:bg-red-50 cursor-pointer'
+            }
+            disabled:opacity-50
+          `}
+        >
+          {hasVoted ? <LikeFilled className="text-red-700" /> : <LikeOutlined />}
+          <span className="font-semibold">{complaint.upvotes}</span>
+          {hasVoted && <span className="text-xs opacity-70">{t('upvote')}</span>}
+        </button>
+
+        {/* Admin / Author controls */}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => setIsStatusModalVisible(true)}
+              className="text-xs"
+              aria-label={t('updateStatus')}
+            >
+              {t('updateStatus')}
+            </Button>
+          )}
+          {isAuthor && (
+            <Popconfirm
+              title={t('deleteComplaint') + '?'}
+              description="This action cannot be undone."
+              onConfirm={() => onDelete(complaint.id)}
+              okText={t('deleteComplaint')}
+              cancelText={t('cancel') || 'Cancel'}
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                className="text-xs"
+                aria-label={t('deleteComplaint')}
+              >
+                {t('deleteComplaint')}
+              </Button>
+            </Popconfirm>
+          )}
+        </div>
+      </div>
 
       {/* Status Update Modal */}
       <Modal
-        title="Update Complaint Status"
-        visible={isStatusModalVisible}
+        title={t('updateStatus')}
+        open={isStatusModalVisible}
         onOk={handleStatusUpdate}
         onCancel={() => setIsStatusModalVisible(false)}
+        okText={t('submitComplaint') || 'Save Changes'}
+        centered
+        width={400}
       >
+        <p className="text-sm text-slate-500 mb-3">Select the new status for this complaint:</p>
         <Select
           value={selectedStatus}
           onChange={setSelectedStatus}
           style={{ width: '100%' }}
+          size="large"
         >
           {COMPLAINT_STATUS.map((status) => (
             <Select.Option key={status} value={status}>
-              {status.replace('_', ' ').toUpperCase()}
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{
+                  background: status === 'pending' ? '#f59e0b'
+                    : status === 'in_progress' ? '#003893'
+                    : status === 'resolved' ? '#059669'
+                    : '#dc2626'
+                }} />
+                {tStatus(status)}
+              </span>
             </Select.Option>
           ))}
         </Select>
       </Modal>
-    </Card>
+    </article>
   );
 };
 

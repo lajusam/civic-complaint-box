@@ -6,7 +6,7 @@
 cd complaint-box/frontend
 npm install
 npm run dev
-```
+``` 
 
 Visit `http://localhost:3000` - Everything works with mock data!
 

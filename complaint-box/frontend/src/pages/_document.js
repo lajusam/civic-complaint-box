@@ -1,22 +1,22 @@
-// _document.js
-// Next.js document wrapper for HTML structure
-
 import { Html, Head, Main, NextScript } from 'next/document';
 
-/**
- * _document.js
- * Custom HTML document for Next.js
- */
 export default function Document() {
   return (
     <Html lang="en">
       <Head>
         <meta charSet="utf-8" />
         <link rel="icon" href="/favicon.ico" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="description" content="Decentralized Civic Complaint Box on Solana" />
+        <meta name="theme-color" content="#6366f1" />
+        <meta name="description" content="Decentralized Civic Complaint Box — File and track community complaints on Solana" />
+        {/* Inter font — professional, clean, modern */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
       </Head>
-      <body>
+      <body className="antialiased">
         <Main />
         <NextScript />
       </body>
