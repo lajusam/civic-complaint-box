@@ -71,8 +71,10 @@ export const isAdminWallet = (walletAddress) => {
 // Transaction confirmation timeout (in ms)
 export const TX_CONFIRMATION_TIMEOUT = 30000;
 
-// Backend API URL (set via env or default to localhost)
-export const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000';
+// Backend API URL
+// On Vercel: leave NEXT_PUBLIC_BACKEND_API_URL unset → uses relative '/api' (same-origin API routes)
+// Locally with Express: set NEXT_PUBLIC_BACKEND_API_URL=http://localhost:5000
+export const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || '';
 
 // Pagination
 export const ITEMS_PER_PAGE = 10;

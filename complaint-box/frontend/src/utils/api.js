@@ -1,14 +1,23 @@
 /**
  * Backend API utility for Civic Complaint Box
  *
- * Sends complaint + image data to the Express backend
- * using FormData (multipart/form-data).
+ * Works with BOTH:
+ *   1. The built-in Next.js API route (/api/complaints) on Vercel  — JSON body
+ *   2. The standalone Express backend (localhost:5000)              — FormData body
+ *
+ * Detection: if BACKEND_API_URL is empty (default on Vercel), we use
+ * the same-origin /api path and send JSON.  Otherwise we send FormData
+ * to the external Express server.
  */
 
 import axios from 'axios';
 import { BACKEND_API_URL } from './constants';
 
-const API_BASE = `${BACKEND_API_URL}/api`;
+// When BACKEND_API_URL is empty, API_BASE becomes '/api' (relative → same-origin)
+const API_BASE = BACKEND_API_URL ? `${BACKEND_API_URL}/api` : '/api';
+
+// True when using the built-in Next.js API route (no external backend)
+const isBuiltInApi = !BACKEND_API_URL;
 
 /**
  * Submit a complaint with optional images to the backend.
@@ -30,49 +39,48 @@ export const submitComplaintToBackend = async ({
   author,
   imageFiles = [],
 }) => {
-  const formData = new FormData();
-
-  // Append text fields
-  formData.append('title', title);
-  formData.append('description', description);
-  formData.append('category', category);
-  formData.append('location', location);
-  formData.append('author', author || 'Anonymous');
-
-  // Append image files (field name must match backend: 'images')
-  if (imageFiles.length > 0) {
-    imageFiles.forEach((file) => {
-      formData.append('images', file);
-    });
-  }
-
   try {
-    const response = await axios.post(`${API_BASE}/complaints`, formData, {
-      headers: {
-        // Let browser set Content-Type with correct boundary for multipart/form-data
-        // Do NOT manually set Content-Type — axios/browser will add the boundary
-      },
-      timeout: 60000, // 60s timeout for large uploads
-    });
+    let response;
+
+    if (isBuiltInApi) {
+      // ── Built-in Next.js API route: send JSON ──
+      response = await axios.post(`${API_BASE}/complaints`, {
+        title,
+        description: description || '',
+        category,
+        location,
+        author: author || 'Anonymous',
+        imageUrls: [],
+      }, {
+        timeout: 15000,
+      });
+    } else {
+      // ── External Express backend: send FormData for file uploads ──
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description || '');
+      formData.append('category', category);
+      formData.append('location', location);
+      formData.append('author', author || 'Anonymous');
+
+      if (imageFiles.length > 0) {
+        imageFiles.forEach((file) => formData.append('images', file));
+      }
+
+      response = await axios.post(`${API_BASE}/complaints`, formData, {
+        timeout: 60000,
+      });
+    }
 
     return response.data;
   } catch (error) {
-    // Extract server-provided error message if available
     const serverMsg = error.response?.data?.error;
     const status = error.response?.status;
 
-    if (status === 400) {
-      throw new Error(serverMsg || 'Invalid complaint data. Please check your inputs.');
-    }
-    if (status === 413) {
-      throw new Error('Image file is too large. Maximum size is 5MB.');
-    }
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error('Cannot connect to backend server. Is it running?');
-    }
-    if (error.code === 'ECONNABORTED') {
-      throw new Error('Upload timed out. Please try with a smaller image.');
-    }
+    if (status === 400) throw new Error(serverMsg || 'Invalid complaint data. Please check your inputs.');
+    if (status === 413) throw new Error('Image file is too large. Maximum size is 5MB.');
+    if (error.code === 'ECONNREFUSED') throw new Error('Cannot connect to backend server. Is it running?');
+    if (error.code === 'ECONNABORTED') throw new Error('Upload timed out. Please try with a smaller image.');
 
     throw new Error(serverMsg || 'Failed to submit complaint. Please try again.');
   }

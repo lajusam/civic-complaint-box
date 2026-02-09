@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { ConfigProvider } from 'antd';
 import '../styles/globals.css';
-import WalletConnectionProvider from '../components/WalletConnectionProvider';
 import { LanguageProvider } from '../context/LanguageContext';
+
+// Dynamic import with SSR disabled — PhantomWalletAdapter and @solana packages
+// access browser globals (window, crypto) which crash during server-side rendering.
+const WalletConnectionProvider = dynamic(
+  () => import('../components/WalletConnectionProvider'),
+  { ssr: false }
+);
 
 const antdTheme = {
   token: {

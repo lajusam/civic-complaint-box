@@ -117,7 +117,9 @@ export default function Home() {
           }));
           setComplaints(normalized);
           // Cache to localStorage as offline fallback
-          localStorage.setItem('civic-complaints', JSON.stringify(normalized));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('civic-complaints', JSON.stringify(normalized));
+          }
         } else {
           // Backend is online but no complaints yet — show seed data
           setComplaints(SEED_COMPLAINTS);
@@ -125,12 +127,12 @@ export default function Home() {
       } else {
         // FALLBACK: backend offline → load from localStorage
         console.warn('Backend offline — loading cached complaints from localStorage');
-        const stored = localStorage.getItem('civic-complaints');
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('civic-complaints') : null;
         setComplaints(stored ? JSON.parse(stored) : SEED_COMPLAINTS);
       }
     } catch (err) {
       console.error('Error loading complaints:', err);
-      const stored = localStorage.getItem('civic-complaints');
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('civic-complaints') : null;
       setComplaints(stored ? JSON.parse(stored) : SEED_COMPLAINTS);
     } finally {
       setLoading(false);
@@ -154,6 +156,7 @@ export default function Home() {
 
   // Load user votes from localStorage (votes are per-device, which is fine)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       const storedVotes = localStorage.getItem('civic-user-votes');
       if (storedVotes) setUserVotes(JSON.parse(storedVotes));
@@ -205,6 +208,7 @@ export default function Home() {
 
   // Persist user votes
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (Object.keys(userVotes).length > 0) {
       localStorage.setItem('civic-user-votes', JSON.stringify(userVotes));
     }
@@ -242,11 +246,11 @@ export default function Home() {
           console.error('Backend submission failed:', err);
           message.warning('Saved locally. It will sync when the server is back online.');
           // Keep the optimistic local version
-          localStorage.setItem('civic-complaints', JSON.stringify([tempComplaint, ...complaints]));
+          if (typeof window !== 'undefined') localStorage.setItem('civic-complaints', JSON.stringify([tempComplaint, ...complaints]));
         }
       } else {
         // Offline fallback: save to localStorage only
-        localStorage.setItem('civic-complaints', JSON.stringify([tempComplaint, ...complaints]));
+        if (typeof window !== 'undefined') localStorage.setItem('civic-complaints', JSON.stringify([tempComplaint, ...complaints]));
         message.info('Backend offline — complaint saved locally.');
       }
     },
