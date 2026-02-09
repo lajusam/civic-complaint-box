@@ -4,6 +4,12 @@
  * Serverless endpoint for complaint CRUD — runs on Vercel automatically.
  * This replaces the need for a separate Express backend in production.
  *
+ * Supports:
+ *   GET    /api/complaints           — List all complaints
+ *   POST   /api/complaints           — Create a new complaint
+ *   PATCH  /api/complaints?id=X      — Update a complaint (upvote / status)
+ *   DELETE /api/complaints?id=X      — Delete a complaint
+ *
  * STORAGE NOTE:
  *   Currently uses module-level memory (persists only within a warm serverless
  *   instance). For production, replace `complaintsStore` with a real database
@@ -33,7 +39,7 @@ function generateId() {
 export default function handler(req, res) {
   // CORS headers so the frontend (any origin during dev) can call this route
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -74,7 +80,60 @@ export default function handler(req, res) {
     return res.status(201).json(complaint);
   }
 
+  // ── PATCH /api/complaints?id=X ──
+  // Supports: { action: 'upvote' } or { action: 'status', status: 'resolved' }
+  if (req.method === 'PATCH') {
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({ error: 'Complaint id is required as query param.' });
+    }
+
+    const store = getStore();
+    const index = store.findIndex((c) => c.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Complaint not found.' });
+    }
+
+    const { action, status } = req.body || {};
+
+    if (action === 'upvote') {
+      store[index].upvotes = (store[index].upvotes || 0) + 1;
+      setStore(store);
+      return res.status(200).json(store[index]);
+    }
+
+    if (action === 'status' && status) {
+      const validStatuses = ['pending', 'in_progress', 'resolved', 'rejected'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      }
+      store[index].status = status;
+      setStore(store);
+      return res.status(200).json(store[index]);
+    }
+
+    return res.status(400).json({ error: 'Invalid action. Use { action: "upvote" } or { action: "status", status: "..." }.' });
+  }
+
+  // ── DELETE /api/complaints?id=X ──
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({ error: 'Complaint id is required as query param.' });
+    }
+
+    const store = getStore();
+    const index = store.findIndex((c) => c.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Complaint not found.' });
+    }
+
+    store.splice(index, 1);
+    setStore(store);
+    return res.status(200).json({ success: true });
+  }
+
   // ── Unsupported methods ──
-  res.setHeader('Allow', 'GET, POST, OPTIONS');
+  res.setHeader('Allow', 'GET, POST, PATCH, DELETE, OPTIONS');
   return res.status(405).json({ error: `Method ${req.method} not allowed.` });
 }

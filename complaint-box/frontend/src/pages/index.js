@@ -16,7 +16,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useRole } from '../hooks/useRole';
 import { ROLES } from '../utils/constants';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchComplaintsFromBackend, submitComplaintToBackend, isBackendAvailable } from '../utils/api';
+import { fetchComplaintsFromBackend, submitComplaintToBackend, upvoteComplaintOnBackend, updateComplaintStatusOnBackend, deleteComplaintOnBackend, isBackendAvailable } from '../utils/api';
 
 const Header = dynamic(() => import('../components/Header'), { ssr: false });
 const ComplaintForm = dynamic(() => import('../components/ComplaintForm'), { ssr: false });
@@ -259,48 +259,84 @@ export default function Home() {
   );
 
   const handleUpvote = useCallback(
-    (id) => {
+    async (id) => {
       if (!publicKey) {
         message.warning(t('connectWalletUpvote'));
-        return Promise.resolve(false);
+        return false;
       }
       if (userVotes[id]) {
         message.info(t('alreadyUpvoted'));
-        return Promise.resolve(false);
+        return false;
       }
+
+      // Optimistic UI update — immediately reflect the upvote
       setComplaints((prev) => prev.map((c) => (c.id === id ? { ...c, upvotes: (c.upvotes || 0) + 1 } : c)));
       setUserVotes((prev) => ({ ...prev, [id]: true }));
+
+      // Persist to backend so ALL users see the updated count
+      if (backendOnline) {
+        try {
+          await upvoteComplaintOnBackend(id);
+        } catch (err) {
+          console.error('Backend upvote failed:', err);
+          // Don't revert — the optimistic update is fine as a local fallback
+        }
+      }
+
       message.success(t('upvoteRecorded'));
-      return Promise.resolve(true);
+      return true;
     },
-    [publicKey, userVotes, t]
+    [publicKey, userVotes, t, backendOnline]
   );
 
-  const handleDelete = useCallback((id) => {
+  const handleDelete = useCallback(async (id) => {
     // Frontend check: only admin or the complaint author can delete
     // On-chain: the delete_complaint instruction enforces admin-only via UnauthorizedAdmin error
     if (!isAdmin) {
       message.error(t('adminOnly'));
       return;
     }
+
+    // Optimistic UI update
     setComplaints((prev) => prev.filter((c) => c.id !== id));
     setUserVotes((prev) => {
       const v = { ...prev };
       delete v[id];
       return v;
     });
-    message.success(t('complaintRemoved'));
-  }, [isAdmin, t]);
 
-  const handleStatusUpdate = useCallback((id, status) => {
+    // Persist to backend
+    if (backendOnline) {
+      try {
+        await deleteComplaintOnBackend(id);
+      } catch (err) {
+        console.error('Backend delete failed:', err);
+      }
+    }
+
+    message.success(t('complaintRemoved'));
+  }, [isAdmin, t, backendOnline]);
+
+  const handleStatusUpdate = useCallback(async (id, status) => {
     // Frontend check: only admin can update status
     // On-chain: the update_status instruction enforces admin-only via UnauthorizedAdmin error
     if (!isAdmin) {
       message.error(t('adminOnly'));
       return;
     }
+
+    // Optimistic UI update
     setComplaints((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
-  }, [isAdmin, t]);
+
+    // Persist to backend
+    if (backendOnline) {
+      try {
+        await updateComplaintStatusOnBackend(id, status);
+      } catch (err) {
+        console.error('Backend status update failed:', err);
+      }
+    }
+  }, [isAdmin, t, backendOnline]);
 
   return (
     <>

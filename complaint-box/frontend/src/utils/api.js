@@ -101,6 +101,68 @@ export const fetchComplaintsFromBackend = async () => {
 };
 
 /**
+ * Upvote a complaint on the backend.
+ * Sends PATCH /api/complaints?id=X with { action: 'upvote' }
+ *
+ * @param {string} complaintId - The complaint ID to upvote
+ * @returns {Promise<Object>} The updated complaint
+ */
+export const upvoteComplaintOnBackend = async (complaintId) => {
+  try {
+    const response = await axios.patch(
+      `${API_BASE}/complaints?id=${encodeURIComponent(complaintId)}`,
+      { action: 'upvote' },
+      { timeout: 10000 }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Failed to upvote complaint on backend:', error.message);
+    throw new Error(error.response?.data?.error || 'Failed to record upvote.');
+  }
+};
+
+/**
+ * Update complaint status on the backend (admin only).
+ * Sends PATCH /api/complaints?id=X with { action: 'status', status: 'resolved' }
+ *
+ * @param {string} complaintId - The complaint ID to update
+ * @param {string} newStatus   - New status value
+ * @returns {Promise<Object>} The updated complaint
+ */
+export const updateComplaintStatusOnBackend = async (complaintId, newStatus) => {
+  try {
+    const response = await axios.patch(
+      `${API_BASE}/complaints?id=${encodeURIComponent(complaintId)}`,
+      { action: 'status', status: newStatus },
+      { timeout: 10000 }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Failed to update complaint status on backend:', error.message);
+    throw new Error(error.response?.data?.error || 'Failed to update status.');
+  }
+};
+
+/**
+ * Delete a complaint on the backend (admin only).
+ * Sends DELETE /api/complaints?id=X
+ *
+ * @param {string} complaintId - The complaint ID to delete
+ * @returns {Promise<void>}
+ */
+export const deleteComplaintOnBackend = async (complaintId) => {
+  try {
+    await axios.delete(
+      `${API_BASE}/complaints?id=${encodeURIComponent(complaintId)}`,
+      { timeout: 10000 }
+    );
+  } catch (error) {
+    console.error('Failed to delete complaint on backend:', error.message);
+    throw new Error(error.response?.data?.error || 'Failed to delete complaint.');
+  }
+};
+
+/**
  * Check if the backend server is available.
  * @returns {Promise<boolean>}
  */
