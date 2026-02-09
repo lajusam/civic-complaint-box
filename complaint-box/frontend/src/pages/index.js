@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { Spin, Button, message, Drawer } from 'antd';
@@ -10,11 +10,13 @@ import {
   TeamOutlined,
   RiseOutlined,
   FilterOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useRole } from '../hooks/useRole';
 import { ROLES } from '../utils/constants';
 import { useLanguage } from '../context/LanguageContext';
+import { fetchComplaintsFromBackend, submitComplaintToBackend, isBackendAvailable } from '../utils/api';
 
 const Header = dynamic(() => import('../components/Header'), { ssr: false });
 const ComplaintForm = dynamic(() => import('../components/ComplaintForm'), { ssr: false });
@@ -81,6 +83,8 @@ export default function Home() {
   const { t, tCategory, tStatus } = useLanguage();
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
   const [userVotes, setUserVotes] = useState({});
   const [showForm, setShowForm] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
@@ -90,33 +94,73 @@ export default function Home() {
     location: '',
     sortBy: 'newest',
   });
+  const pollIntervalRef = useRef(null);
 
-  // Load data once
-  useEffect(() => {
+  // ── Fetch complaints from backend (shared by all users) ──
+  const loadComplaints = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
     try {
+      const online = await isBackendAvailable();
+      setBackendOnline(online);
+
+      if (online) {
+        // PRIMARY: fetch from backend so ALL users see ALL complaints
+        const data = await fetchComplaintsFromBackend();
+        if (data && data.length > 0) {
+          // Normalize createdAt to unix seconds for consistent sorting
+          const normalized = data.map((c) => ({
+            ...c,
+            createdAt:
+              typeof c.createdAt === 'string'
+                ? Math.floor(new Date(c.createdAt).getTime() / 1000)
+                : c.createdAt,
+          }));
+          setComplaints(normalized);
+          // Cache to localStorage as offline fallback
+          localStorage.setItem('civic-complaints', JSON.stringify(normalized));
+        } else {
+          // Backend is online but no complaints yet — show seed data
+          setComplaints(SEED_COMPLAINTS);
+        }
+      } else {
+        // FALLBACK: backend offline → load from localStorage
+        console.warn('Backend offline — loading cached complaints from localStorage');
+        const stored = localStorage.getItem('civic-complaints');
+        setComplaints(stored ? JSON.parse(stored) : SEED_COMPLAINTS);
+      }
+    } catch (err) {
+      console.error('Error loading complaints:', err);
       const stored = localStorage.getItem('civic-complaints');
-      const storedVotes = localStorage.getItem('civic-user-votes');
       setComplaints(stored ? JSON.parse(stored) : SEED_COMPLAINTS);
-      if (storedVotes) setUserVotes(JSON.parse(storedVotes));
-    } catch {
-      setComplaints(SEED_COMPLAINTS);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  // Persist
+  // Load data on mount + poll every 30 seconds for real-time updates
   useEffect(() => {
-    if (!loading && complaints.length > 0) {
-      localStorage.setItem('civic-complaints', JSON.stringify(complaints));
-    }
-  }, [complaints, loading]);
+    loadComplaints();
 
+    // Poll for new complaints so the feed updates across users
+    pollIntervalRef.current = setInterval(() => {
+      loadComplaints(false);
+    }, 30000);
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [loadComplaints]);
+
+  // Load user votes from localStorage (votes are per-device, which is fine)
   useEffect(() => {
-    if (!loading) {
-      localStorage.setItem('civic-user-votes', JSON.stringify(userVotes));
+    try {
+      const storedVotes = localStorage.getItem('civic-user-votes');
+      if (storedVotes) setUserVotes(JSON.parse(storedVotes));
+    } catch {
+      // ignore
     }
-  }, [userVotes, loading]);
+  }, []);
 
   // Filtered + sorted + memoized
   const filteredComplaints = useMemo(() => {
@@ -159,9 +203,17 @@ export default function Home() {
     return filters.categories.length + filters.statuses.length + (filters.location ? 1 : 0);
   }, [filters]);
 
+  // Persist user votes
+  useEffect(() => {
+    if (Object.keys(userVotes).length > 0) {
+      localStorage.setItem('civic-user-votes', JSON.stringify(userVotes));
+    }
+  }, [userVotes]);
+
   const handleComplaintCreated = useCallback(
-    (data) => {
-      const newComplaint = {
+    async (data) => {
+      // Optimistic: add to local state immediately so the user sees it
+      const tempComplaint = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         ...data,
         author: publicKey?.toString() || 'Anonymous',
@@ -169,10 +221,36 @@ export default function Home() {
         upvotes: 0,
         status: 'pending',
       };
-      setComplaints((prev) => [newComplaint, ...prev]);
+      setComplaints((prev) => [tempComplaint, ...prev]);
       setShowForm(false);
+
+      // Submit to backend so ALL users can see it
+      if (backendOnline) {
+        try {
+          await submitComplaintToBackend({
+            title: data.title,
+            description: data.description || '',
+            category: data.category,
+            location: data.location,
+            author: publicKey?.toString() || 'Anonymous',
+            imageFiles: [], // images already uploaded to IPFS by the form
+          });
+          // Re-fetch to get the backend-assigned ID and ensure consistency
+          await loadComplaints(false);
+          message.success('Complaint submitted and shared with all users!');
+        } catch (err) {
+          console.error('Backend submission failed:', err);
+          message.warning('Saved locally. It will sync when the server is back online.');
+          // Keep the optimistic local version
+          localStorage.setItem('civic-complaints', JSON.stringify([tempComplaint, ...complaints]));
+        }
+      } else {
+        // Offline fallback: save to localStorage only
+        localStorage.setItem('civic-complaints', JSON.stringify([tempComplaint, ...complaints]));
+        message.info('Backend offline — complaint saved locally.');
+      }
     },
-    [publicKey]
+    [publicKey, backendOnline, complaints, loadComplaints]
   );
 
   const handleUpvote = useCallback(
@@ -222,6 +300,7 @@ export default function Home() {
     <>
       <Head>
         <title>CivicPulse — Transparent Civic Complaints on Solana</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
         <meta
           name="description"
           content="File and track civic complaints transparently on the Solana blockchain. Your voice matters — permanent, tamper-proof, community-driven."
@@ -263,19 +342,19 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 <Button
                   type="primary"
                   size="large"
                   icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
                   onClick={() => setShowForm(!showForm)}
-                  className="!bg-white !text-red-900 !border-white hover:!bg-red-50 !font-bold !shadow-lg"
+                  className="!bg-white !text-red-900 !border-white hover:!bg-red-50 !font-bold !shadow-lg text-sm sm:text-base"
                 >
                   {showForm ? t('cancel') : t('fileAComplaint')}
                 </Button>
                 <Button
                   size="large"
-                  className="!bg-black !text-white !border-black hover:!bg-gray-800 !font-semibold"
+                  className="!bg-black !text-white !border-black hover:!bg-gray-800 !font-semibold text-sm sm:text-base"
                   onClick={() => document.getElementById('complaints-feed')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   {t('browseComplaints')}
@@ -284,7 +363,7 @@ export default function Home() {
             </div>
 
             {/* Trust metrics */}
-            <div className="grid grid-cols-3 gap-4 mt-8 max-w-lg">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-6 sm:mt-8 max-w-lg">
               <div className="hero-stat-card text-center">
                 <div className="hero-stat-value text-xl sm:text-2xl font-bold" style={{ fontFamily: 'Poppins, Inter, sans-serif' }}>
                   {stats.total}
@@ -334,19 +413,30 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              <Button
-                type="primary"
-                size="large"
-                icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
-                onClick={() => {
-                  setShowForm(!showForm);
-                  if (!showForm) {
-                    setTimeout(() => document.getElementById('file-complaint')?.scrollIntoView({ behavior: 'smooth' }), 100);
-                  }
-                }}
-              >
-                {showForm ? t('cancel') : t('fileComplaint')}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
+                  onClick={() => {
+                    setShowForm(!showForm);
+                    if (!showForm) {
+                      setTimeout(() => document.getElementById('file-complaint')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                    }
+                  }}
+                >
+                  {showForm ? t('cancel') : t('fileComplaint')}
+                </Button>
+                <Button
+                  size="large"
+                  icon={<ReloadOutlined spin={refreshing} />}
+                  onClick={() => loadComplaints(true)}
+                  loading={refreshing}
+                  title="Refresh complaints from all users"
+                >
+                  {refreshing ? '' : 'Refresh'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -464,13 +554,13 @@ export default function Home() {
                   <p className="text-xs text-slate-400 m-0">&copy; {new Date().getFullYear()} &middot; Open Source</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-xs text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-400">
                 <span className="flex items-center gap-1">
                   <SafetyCertificateOutlined aria-hidden="true" /> Powered by Solana
                 </span>
-                <span className="w-px h-3 bg-slate-200" aria-hidden="true" />
+                <span className="w-px h-3 bg-slate-200 hidden sm:block" aria-hidden="true" />
                 <span>Stored on IPFS</span>
-                <span className="w-px h-3 bg-slate-200" aria-hidden="true" />
+                <span className="w-px h-3 bg-slate-200 hidden sm:block" aria-hidden="true" />
                 <span className="flex items-center gap-1">
                   <TeamOutlined aria-hidden="true" /> Community Driven
                 </span>

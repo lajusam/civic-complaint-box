@@ -96,7 +96,7 @@ const ComplaintCard = ({
       aria-label={`Complaint: ${complaint.title}`}
     >
       {/* Top row: Category + Trust Badges + Status */}
-      <div className="flex items-start justify-between mb-3 gap-2 flex-wrap">
+      <div className="flex items-start justify-between mb-3 gap-2 flex-wrap min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="category-chip"
@@ -152,7 +152,7 @@ const ComplaintCard = ({
 
       {/* Images */}
       {((complaint.imageUrls && complaint.imageUrls.length > 0) || (complaint.images && complaint.images.length > 0)) && (
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap gap-2 overflow-x-auto">
           {(complaint.imageUrls || complaint.images).map((imgSrc, idx) => {
             const isLocalBlob = imgSrc && imgSrc.startsWith('blob:');
             const src = isLocalBlob ? imgSrc : `${IPFS_GATEWAY}${imgSrc}`;
@@ -168,7 +168,7 @@ const ComplaintCard = ({
                 <img
                   src={src}
                   alt={`Evidence ${idx + 1}`}
-                  className="w-24 h-24 object-cover rounded-lg border border-slate-200 hover:border-red-300 transition-colors cursor-pointer"
+                  className="w-16 h-16 sm:w-24 sm:h-24 object-cover rounded-lg border border-slate-200 hover:border-red-300 transition-colors cursor-pointer"
                   loading="lazy"
                   onError={(e) => {
                     e.target.onerror = null;
@@ -230,7 +230,7 @@ const ComplaintCard = ({
       )}
 
       {/* Action bar */}
-      <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
         {/* Upvote */}
         <button
           onClick={handleUpvote}
