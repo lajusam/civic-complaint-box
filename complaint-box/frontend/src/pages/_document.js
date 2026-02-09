@@ -5,6 +5,7 @@ export default function Document() {
     <Html lang="en">
       <Head>
         <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
         <link rel="icon" href="/favicon.ico" />
         <meta name="theme-color" content="#DC143C" />
         <meta name="description" content="Decentralized Civic Complaint Box — File and track community complaints on Solana" />

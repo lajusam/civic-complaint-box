@@ -69,7 +69,7 @@ const Header = () => {
       </a>
 
       <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/90 backdrop-blur-xl no-print" role="banner">
-        <div className="page-container flex h-16 items-center justify-between">
+        <div className="page-container flex h-16 items-center justify-between gap-2 overflow-hidden">
           {/* Left — Brand */}
           <Link href="/" className="flex items-center gap-3 no-underline group" aria-label="CivicPulse - Home">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-700 text-white text-lg font-bold shadow-sm group-hover:shadow-md transition-shadow" aria-hidden="true">
@@ -133,7 +133,7 @@ const Header = () => {
           </nav>
 
           {/* Right — Language Toggle + Wallet + Mobile Menu */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 min-w-0">
             {/* Language Toggle Button */}
             <Tooltip title={language === 'en' ? 'नेपालीमा हेर्नुहोस्' : 'View in English'}>
               <button

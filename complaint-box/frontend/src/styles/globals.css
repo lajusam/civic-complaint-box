@@ -83,6 +83,7 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 body {
@@ -90,6 +91,8 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Headings — crisp rendering everywhere */
@@ -151,7 +154,13 @@ h1, h2, h3, h4, h5, h6 {
 .glass-card:hover {
   box-shadow: var(--shadow-md);
   border-color: rgba(220, 20, 60, 0.15);
-  transform: translateY(-1px);
+}
+
+/* Only apply hover transform on non-touch devices to prevent z-index / stacking issues on mobile */
+@media (hover: hover) and (pointer: fine) {
+  .glass-card:hover {
+    transform: translateY(-1px);
+  }
 }
 
 /* Clickable card variant */
@@ -212,6 +221,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-fade-in-up {
   animation: fadeInUp 0.4s ease-out both;
+  /* Ensure element is interactive even during animation */
+  pointer-events: auto;
 }
 
 .animate-fade-in {
@@ -707,10 +718,36 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-lg) !important;
 }
 
+/* ── Mobile Touch — ensure buttons are always tappable ── */
+@media (pointer: coarse) {
+  /* Disable hover transforms on touch devices to prevent stacking context issues */
+  .glass-card:hover {
+    transform: none !important;
+  }
+
+  .glass-card-interactive:hover {
+    transform: none !important;
+  }
+
+  /* Ensure minimum 44px touch target for buttons and interactive elements */
+  button,
+  [role="button"],
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Remove 300ms tap delay */
+  a, button, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .page-container {
     @apply px-4;
+    max-width: 100vw;
   }
 
   .filter-sidebar {
@@ -750,9 +787,13 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 9px !important;
   }
 
-  /* Glass cards — reduce padding */
+  /* Glass cards — reduce padding, prevent overflow */
   .glass-card {
     padding: 14px !important;
+    max-width: 100%;
+    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   /* Status badges — slightly smaller */
@@ -779,6 +820,12 @@ h1, h2, h3, h4, h5, h6 {
     width: 64px !important;
     height: 64px !important;
   }
+
+  /* Upvote / action buttons — ensure tappable on mobile */
+  .glass-card button {
+    position: relative;
+    z-index: 2;
+  }
 }
 
 @media (max-width: 640px) {
@@ -791,11 +838,6 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 13px !important;
     padding: 6px 14px !important;
     height: 38px !important;
-  }
-
-  /* Prevent horizontal overflow on small screens */
-  html, body {
-    overflow-x: hidden;
   }
 
   /* Steps indicator — compact */

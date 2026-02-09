@@ -69,15 +69,21 @@ const ComplaintCard = ({
   }, [complaint.status]);
 
   const handleUpvote = useCallback(async () => {
+    if (isUpvoting || hasVoted) return;
     setIsUpvoting(true);
     try {
-      await onUpvote(complaint.id);
+      const result = onUpvote(complaint.id);
+      // Handle both sync and async onUpvote
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
     } catch (error) {
+      console.error('Upvote error:', error);
       message.error('Failed to upvote. Please try again.');
     } finally {
       setIsUpvoting(false);
     }
-  }, [onUpvote, complaint.id]);
+  }, [onUpvote, complaint.id, isUpvoting, hasVoted]);
 
   const handleStatusUpdate = useCallback(async () => {
     try {
@@ -91,13 +97,14 @@ const ComplaintCard = ({
 
   return (
     <article
-      className="glass-card p-5 mb-4 animate-fade-in-up"
+      className="glass-card p-5 mb-4 animate-fade-in-up relative"
+      style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
       role="article"
       aria-label={`Complaint: ${complaint.title}`}
     >
       {/* Top row: Category + Trust Badges + Status */}
-      <div className="flex items-start justify-between mb-3 gap-2 flex-wrap min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-start justify-between mb-3 gap-2 flex-wrap min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
           <span
             className="category-chip"
             style={{ background: `${catMeta.color}10`, color: catMeta.color, borderColor: `${catMeta.color}30`, border: '1px solid' }}
@@ -185,8 +192,8 @@ const ComplaintCard = ({
       )}
 
       {/* Meta row */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mb-3">
-        <span className="inline-flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mb-3 overflow-hidden">
+        <span className="inline-flex items-center gap-1 truncate max-w-[200px]">
           <EnvironmentOutlined aria-hidden="true" /> {complaint.location}
         </span>
         <span className="inline-flex items-center gap-1">
@@ -230,19 +237,30 @@ const ComplaintCard = ({
       )}
 
       {/* Action bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 relative z-10">
         {/* Upvote */}
         <button
-          onClick={handleUpvote}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleUpvote();
+          }}
+          onTouchEnd={(e) => {
+            // Ensure touch events fire reliably on mobile
+            e.preventDefault();
+            handleUpvote();
+          }}
           disabled={isUpvoting || hasVoted}
           aria-label={hasVoted ? `You upvoted this complaint. ${complaint.upvotes} total votes` : `Upvote this complaint. ${complaint.upvotes} current votes`}
           aria-pressed={hasVoted}
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           className={`
-            inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
-            transition-all duration-150 border
+            inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
+            transition-all duration-150 border relative z-10
+            min-h-[44px]
             ${hasVoted
               ? 'bg-red-50 text-red-800 border-red-200 cursor-default'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-red-300 hover:text-red-800 hover:bg-red-50 cursor-pointer'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-red-300 hover:text-red-800 hover:bg-red-50 cursor-pointer active:bg-red-100'
             }
             disabled:opacity-50
           `}

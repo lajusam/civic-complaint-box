@@ -217,8 +217,9 @@ export default function Home() {
   const handleComplaintCreated = useCallback(
     async (data) => {
       // Optimistic: add to local state immediately so the user sees it
+      const tempId = 'temp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const tempComplaint = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: tempId,
         ...data,
         author: publicKey?.toString() || 'Anonymous',
         createdAt: Math.floor(Date.now() / 1000),
@@ -261,15 +262,16 @@ export default function Home() {
     (id) => {
       if (!publicKey) {
         message.warning(t('connectWalletUpvote'));
-        return;
+        return Promise.resolve(false);
       }
       if (userVotes[id]) {
         message.info(t('alreadyUpvoted'));
-        return;
+        return Promise.resolve(false);
       }
-      setComplaints((prev) => prev.map((c) => (c.id === id ? { ...c, upvotes: c.upvotes + 1 } : c)));
+      setComplaints((prev) => prev.map((c) => (c.id === id ? { ...c, upvotes: (c.upvotes || 0) + 1 } : c)));
       setUserVotes((prev) => ({ ...prev, [id]: true }));
       message.success(t('upvoteRecorded'));
+      return Promise.resolve(true);
     },
     [publicKey, userVotes, t]
   );
