@@ -16,6 +16,20 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useRole } from '../hooks/useRole';
 import { ROLES } from '../utils/constants';
 import { useLanguage } from '../context/LanguageContext';
+import { WalletOutlined } from '@ant-design/icons';
+
+/**
+ * Detect whether a Solana wallet (window.solana) is available.
+ * Returns false on mobile browsers without Phantom / Solflare.
+ */
+function detectWalletAvailable() {
+  if (typeof window === 'undefined') return false;
+  return !!(
+    window.phantom?.solana?.isPhantom ||
+    window.solana?.isPhantom ||
+    window.solflare
+  );
+}
 import { fetchComplaintsFromBackend, submitComplaintToBackend, upvoteComplaintOnBackend, updateComplaintStatusOnBackend, deleteComplaintOnBackend, isBackendAvailable } from '../utils/api';
 
 const Header = dynamic(() => import('../components/Header'), { ssr: false });
@@ -95,6 +109,12 @@ export default function Home() {
     sortBy: 'newest',
   });
   const pollIntervalRef = useRef(null);
+
+  // Detect wallet extension availability (Phantom / Solflare)
+  const [walletAvailable, setWalletAvailable] = useState(true); // optimistic
+  useEffect(() => {
+    setWalletAvailable(detectWalletAvailable());
+  }, []);
 
   // ── Fetch complaints from backend (shared by all users) ──
   const loadComplaints = useCallback(async (showSpinner = false) => {
@@ -384,16 +404,39 @@ export default function Home() {
                   </span>
                 </div>
               )}
+
+              {/* Wallet not detected banner — shown on mobile / browsers without extension */}
+              {!walletAvailable && !isConnected && (
+                <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl bg-amber-50/80 border border-amber-200 max-w-lg">
+                  <WalletOutlined className="text-amber-600 text-lg flex-shrink-0" />
+                  <p className="text-xs sm:text-sm text-amber-800 m-0 leading-relaxed">
+                    Wallet not detected. To submit complaints, please open this site in{' '}
+                    <a
+                      href="https://phantom.app/download"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-violet-700 underline"
+                    >
+                      Phantom Wallet app
+                    </a>{' '}
+                    or on a desktop browser.
+                  </p>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2 sm:gap-3">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
-                  onClick={() => setShowForm(!showForm)}
-                  className="!bg-white !text-red-900 !border-white hover:!bg-red-50 !font-bold !shadow-lg text-sm sm:text-base"
-                >
-                  {showForm ? t('cancel') : t('fileAComplaint')}
-                </Button>
+                {/* Show "File a Complaint" only when wallet is available */}
+                {walletAvailable && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
+                    onClick={() => setShowForm(!showForm)}
+                    className="!bg-white !text-red-900 !border-white hover:!bg-red-50 !font-bold !shadow-lg text-sm sm:text-base"
+                  >
+                    {showForm ? t('cancel') : t('fileAComplaint')}
+                  </Button>
+                )}
                 <Button
                   size="large"
                   className="!bg-black !text-white !border-black hover:!bg-gray-800 !font-semibold text-sm sm:text-base"
@@ -456,19 +499,21 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
-                  onClick={() => {
-                    setShowForm(!showForm);
-                    if (!showForm) {
-                      setTimeout(() => document.getElementById('file-complaint')?.scrollIntoView({ behavior: 'smooth' }), 100);
-                    }
-                  }}
-                >
-                  {showForm ? t('cancel') : t('fileComplaint')}
-                </Button>
+                {walletAvailable && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={showForm ? <CloseOutlined /> : <PlusOutlined />}
+                    onClick={() => {
+                      setShowForm(!showForm);
+                      if (!showForm) {
+                        setTimeout(() => document.getElementById('file-complaint')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                      }
+                    }}
+                  >
+                    {showForm ? t('cancel') : t('fileComplaint')}
+                  </Button>
+                )}
                 <Button
                   size="large"
                   icon={<ReloadOutlined spin={refreshing} />}
@@ -520,7 +565,7 @@ export default function Home() {
 
             {/* Feed */}
             <div className="flex-1 min-w-0">
-              {showForm && <ComplaintForm onComplaintCreated={handleComplaintCreated} />}
+              {showForm && walletAvailable && <ComplaintForm onComplaintCreated={handleComplaintCreated} />}
 
               {/* Loading skeleton */}
               {loading && (
@@ -544,7 +589,7 @@ export default function Home() {
                   <p className="text-sm text-slate-400 max-w-xs mb-4">
                     {t('noComplaintsDesc')}
                   </p>
-                  {complaints.length === 0 && (
+                  {complaints.length === 0 && walletAvailable && (
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
