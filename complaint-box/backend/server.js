@@ -31,8 +31,30 @@ const PINATA_API_SECRET = process.env.PINATA_API_SECRET || '';
 const PINATA_ENDPOINT = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const IPFS_GATEWAY = process.env.IPFS_GATEWAY || 'https://gateway.pinata.cloud/ipfs/';
 
-// In-memory complaint store (replace with database in production)
+// File-based complaint store (persists across server restarts)
+const DATA_FILE = path.join(__dirname, 'complaints.json');
 let complaints = [];
+
+// Load existing complaints from file on startup
+try {
+  if (fs.existsSync(DATA_FILE)) {
+    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+    complaints = JSON.parse(raw);
+    console.log(`📂 Loaded ${complaints.length} complaints from ${DATA_FILE}`);
+  }
+} catch (err) {
+  console.error('Failed to load complaints from file:', err.message);
+  complaints = [];
+}
+
+// Helper: persist complaints to disk
+function saveComplaintsToFile() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(complaints, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to save complaints to file:', err.message);
+  }
+}
 
 // ─── Middleware ────────────────────────────────────────────────────────
 
@@ -249,8 +271,9 @@ app.post('/api/complaints', upload.array('images', 5), async (req, res) => {
       // Non-fatal — complaint is still saved in-memory
     }
 
-    // Store complaint
+    // Store complaint and persist to file
     complaints.unshift(complaint);
+    saveComplaintsToFile();
 
     console.log(`✅ Complaint created: "${complaint.title}" (ID: ${complaint.id}, Images: ${imageHashes.length})`);
 
@@ -290,6 +313,66 @@ app.get('/api/complaints/:id', (req, res) => {
     return res.status(404).json({ error: 'Complaint not found.' });
   }
   res.json({ success: true, complaint });
+});
+
+/**
+ * PATCH /api/complaints
+ * Update a complaint (upvote or status change).
+ * Query param: ?id=X
+ * Body: { action: 'upvote' } or { action: 'status', status: 'resolved' }
+ */
+app.patch('/api/complaints', (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ error: 'Complaint id is required as query param.' });
+  }
+
+  const index = complaints.findIndex((c) => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Complaint not found.' });
+  }
+
+  const { action, status } = req.body || {};
+
+  if (action === 'upvote') {
+    complaints[index].upvotes = (complaints[index].upvotes || 0) + 1;
+    saveComplaintsToFile();
+    return res.status(200).json({ success: true, complaint: complaints[index] });
+  }
+
+  if (action === 'status' && status) {
+    const validStatuses = ['pending', 'in_progress', 'resolved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+    complaints[index].status = status;
+    saveComplaintsToFile();
+    return res.status(200).json({ success: true, complaint: complaints[index] });
+  }
+
+  return res.status(400).json({ error: 'Invalid action. Use { action: "upvote" } or { action: "status", status: "..." }.' });
+});
+
+/**
+ * DELETE /api/complaints
+ * Delete a complaint by ID.
+ * Query param: ?id=X
+ */
+app.delete('/api/complaints', (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ error: 'Complaint id is required as query param.' });
+  }
+
+  const index = complaints.findIndex((c) => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Complaint not found.' });
+  }
+
+  complaints.splice(index, 1);
+  saveComplaintsToFile();
+  console.log(`🗑️ Complaint deleted (ID: ${id})`);
+  return res.status(200).json({ success: true });
 });
 
 /**

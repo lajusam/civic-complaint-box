@@ -141,8 +141,9 @@ export default function Home() {
             localStorage.setItem('civic-complaints', JSON.stringify(normalized));
           }
         } else {
-          // Backend is online but no complaints yet — show seed data
-          setComplaints(SEED_COMPLAINTS);
+          // Backend is online but no complaints yet
+          // Only show seed data on first load when there are no existing complaints
+          setComplaints((prev) => (prev.length > 0 ? prev : SEED_COMPLAINTS));
         }
       } else {
         // FALLBACK: backend offline → load from localStorage
