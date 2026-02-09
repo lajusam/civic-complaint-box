@@ -53,6 +53,15 @@ const nextConfig = {
           process: 'process/browser',
         })
       );
+
+      // Restore native crypto.getRandomValues after crypto-browserify polyfill.
+      // crypto-browserify does NOT implement getRandomValues, which causes
+      // "@solana/web3.js: crypto.getRandomValues is not a function" on mobile.
+      config.plugins.push(
+        new webpack.DefinePlugin({
+          'process.env.__NEXT_RESTORE_CRYPTO__': JSON.stringify('true'),
+        })
+      );
     }
 
     // Exclude problematic mobile wallet adapter dependencies (Windows path length issues)

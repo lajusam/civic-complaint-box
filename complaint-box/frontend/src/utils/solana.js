@@ -1,6 +1,23 @@
 // Solana utility functions
 // Handles wallet connections, transaction signing, and blockchain interactions
 
+// Fix crypto.getRandomValues on mobile: crypto-browserify (the webpack polyfill)
+// does NOT implement getRandomValues, so if it overwrites window.crypto,
+// @solana/web3.js crashes. Restore the native implementation here.
+if (typeof window !== 'undefined') {
+  try {
+    if (
+      window.crypto &&
+      !window.crypto.getRandomValues &&
+      window.__nativeCryptoGetRandomValues
+    ) {
+      window.crypto.getRandomValues = window.__nativeCryptoGetRandomValues;
+    }
+  } catch (e) {
+    console.warn('Could not restore crypto.getRandomValues:', e);
+  }
+}
+
 import {
   Connection,
   PublicKey,
