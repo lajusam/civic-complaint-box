@@ -10,6 +10,7 @@
  *   GET  /api/complaints       — List all complaints
  *   GET  /api/complaints/:id   — Get a single complaint
  *   GET  /api/health           — Health check
+ *   GET  /api/health           — Health check
  */
 
 const express = require('express');
