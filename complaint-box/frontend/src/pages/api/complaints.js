@@ -54,7 +54,7 @@ export default function handler(req, res) {
 
   // ── POST /api/complaints ──
   if (req.method === 'POST') {
-    const { title, description, category, location, author, imageUrls } = req.body || {};
+    const { title, description, category, location, author, images, imageUrls, ipfsHash } = req.body || {};
 
     if (!title || !category) {
       return res.status(400).json({ error: 'Title and category are required.' });
@@ -67,7 +67,9 @@ export default function handler(req, res) {
       category: String(category).trim(),
       location: String(location || '').trim(),
       author: String(author || 'Anonymous').trim(),
-      imageUrls: Array.isArray(imageUrls) ? imageUrls : [],
+      images: Array.isArray(images) ? images : [],           // IPFS hashes
+      imageUrls: Array.isArray(imageUrls) ? imageUrls : [],  // Full gateway URLs
+      ipfsHash: ipfsHash || null,
       createdAt: Math.floor(Date.now() / 1000),
       upvotes: 0,
       status: 'pending',

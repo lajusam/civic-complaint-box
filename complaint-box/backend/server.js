@@ -10,7 +10,7 @@
  *   GET  /api/complaints       — List all complaints
  *   GET  /api/complaints/:id   — Get a single complaint
  *   GET  /api/health           — Health check
- *   GET  /api/health           — Health check
+ *   GET  /api/health           — Health checkfx
  */
 
 const express = require('express');
@@ -229,6 +229,45 @@ app.post('/api/complaints', upload.array('images', 5), async (req, res) => {
     const imageHashes = [];
     const imageUrls = [];
 
+    // 1. Accept pre-uploaded IPFS hashes from the frontend (already pinned to IPFS)
+    if (req.body.imageHashes) {
+      try {
+        const preUploadedHashes = JSON.parse(req.body.imageHashes);
+        if (Array.isArray(preUploadedHashes)) {
+          preUploadedHashes.forEach(hash => {
+            if (hash && typeof hash === 'string') {
+              imageHashes.push(hash);
+              imageUrls.push(`${IPFS_GATEWAY}${hash}`);
+            }
+          });
+        }
+      } catch (parseErr) {
+        console.warn('Failed to parse imageHashes:', parseErr.message);
+      }
+    }
+
+    // Also accept pre-existing image URLs
+    if (req.body.existingImageUrls) {
+      try {
+        const existingUrls = JSON.parse(req.body.existingImageUrls);
+        if (Array.isArray(existingUrls)) {
+          existingUrls.forEach(url => {
+            if (url && typeof url === 'string' && !imageUrls.includes(url)) {
+              imageUrls.push(url);
+              // Extract hash from URL if possible
+              const hash = url.replace(IPFS_GATEWAY, '');
+              if (hash && !imageHashes.includes(hash)) {
+                imageHashes.push(hash);
+              }
+            }
+          });
+        }
+      } catch (parseErr) {
+        console.warn('Failed to parse existingImageUrls:', parseErr.message);
+      }
+    }
+
+    // 2. Upload any new file attachments to IPFS
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         try {
@@ -263,13 +302,17 @@ app.post('/api/complaints', upload.array('images', 5), async (req, res) => {
     };
 
     // Upload full complaint JSON to IPFS
-    let ipfsHash = null;
-    try {
-      ipfsHash = await uploadJSONToIPFS(complaint);
+    let ipfsHash = req.body.ipfsHash || null;
+    if (!ipfsHash) {
+      try {
+        ipfsHash = await uploadJSONToIPFS(complaint);
+        complaint.ipfsHash = ipfsHash;
+      } catch (ipfsErr) {
+        console.warn('Failed to upload complaint JSON to IPFS:', ipfsErr.message);
+        // Non-fatal — complaint is still saved in-memory
+      }
+    } else {
       complaint.ipfsHash = ipfsHash;
-    } catch (ipfsErr) {
-      console.warn('Failed to upload complaint JSON to IPFS:', ipfsErr.message);
-      // Non-fatal — complaint is still saved in-memory
     }
 
     // Store complaint and persist to file

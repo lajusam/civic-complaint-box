@@ -259,7 +259,10 @@ export default function Home() {
             category: data.category,
             location: data.location,
             author: publicKey?.toString() || 'Anonymous',
-            imageFiles: [], // images already uploaded to IPFS by the form
+            images: data.images || [],           // IPFS hashes
+            imageUrls: data.imageUrls || [],     // Full IPFS gateway URLs
+            ipfsHash: data.ipfsHash || '',
+            imageFiles: [],
           });
           // Re-fetch to get the backend-assigned ID and ensure consistency
           await loadComplaints(false);

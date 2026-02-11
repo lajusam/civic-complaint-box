@@ -23,9 +23,21 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Image optimization
+  // Image optimization — allow Pinata IPFS gateway
   images: {
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'gateway.pinata.cloud',
+        pathname: '/ipfs/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.mypinata.cloud',
+        pathname: '/ipfs/**',
+      },
+    ],
   },
 
   // Performance optimizations

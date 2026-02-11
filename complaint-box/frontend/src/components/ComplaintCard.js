@@ -160,34 +160,46 @@ const ComplaintCard = ({
       {/* Images */}
       {((complaint.imageUrls && complaint.imageUrls.length > 0) || (complaint.images && complaint.images.length > 0)) && (
         <div className="mb-3 flex flex-wrap gap-2 overflow-x-auto">
-          {(complaint.imageUrls || complaint.images).map((imgSrc, idx) => {
-            const isLocalBlob = imgSrc && imgSrc.startsWith('blob:');
-            const src = isLocalBlob ? imgSrc : `${IPFS_GATEWAY}${imgSrc}`;
-            return (
-              <a
-                key={idx}
-                href={isLocalBlob ? undefined : src}
-                target={isLocalBlob ? undefined : '_blank'}
-                rel={isLocalBlob ? undefined : 'noopener noreferrer'}
-                className="block"
-                onClick={isLocalBlob ? (e) => e.preventDefault() : undefined}
-              >
-                <img
-                  src={src}
-                  alt={`Evidence ${idx + 1}`}
-                  className="w-16 h-16 sm:w-24 sm:h-24 object-cover rounded-lg border border-slate-200 hover:border-red-300 transition-colors cursor-pointer"
-                  loading="lazy"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = '';
-                    e.target.alt = 'Image';
-                    e.target.className = 'w-24 h-24 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center';
-                    e.target.parentElement.innerHTML = '<div class="w-24 h-24 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-400 text-xs text-center p-2">📷 Photo attached</div>';
-                  }}
-                />
-              </a>
-            );
-          })}
+          {(() => {
+            // Determine the best image source list:
+            // 1. Use imageUrls if they exist and contain full URLs
+            // 2. Fall back to images array (IPFS hashes) and prepend gateway
+            const sources = (complaint.imageUrls && complaint.imageUrls.length > 0)
+              ? complaint.imageUrls
+              : (complaint.images || []);
+
+            return sources.map((imgSrc, idx) => {
+              if (!imgSrc) return null;
+              const isLocalBlob = imgSrc.startsWith('blob:');
+              const isFullUrl = imgSrc.startsWith('http://') || imgSrc.startsWith('https://');
+              // Only prepend gateway if it's a bare IPFS hash (not already a URL)
+              const src = isLocalBlob ? imgSrc : isFullUrl ? imgSrc : `${IPFS_GATEWAY}${imgSrc}`;
+              return (
+                <a
+                  key={idx}
+                  href={isLocalBlob ? undefined : src}
+                  target={isLocalBlob ? undefined : '_blank'}
+                  rel={isLocalBlob ? undefined : 'noopener noreferrer'}
+                  className="block"
+                  onClick={isLocalBlob ? (e) => e.preventDefault() : undefined}
+                >
+                  <img
+                    src={src}
+                    alt={`Evidence ${idx + 1}`}
+                    className="w-16 h-16 sm:w-24 sm:h-24 object-cover rounded-lg border border-slate-200 hover:border-red-300 transition-colors cursor-pointer"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '';
+                      e.target.alt = 'Image';
+                      e.target.className = 'w-24 h-24 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center';
+                      e.target.parentElement.innerHTML = '<div class="w-24 h-24 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-400 text-xs text-center p-2">📷 Photo attached</div>';
+                    }}
+                  />
+                </a>
+              );
+            });
+          })()}
         </div>
       )}
 

@@ -37,6 +37,9 @@ export const submitComplaintToBackend = async ({
   category,
   location,
   author,
+  images = [],
+  imageUrls = [],
+  ipfsHash = '',
   imageFiles = [],
 }) => {
   try {
@@ -50,7 +53,9 @@ export const submitComplaintToBackend = async ({
         category,
         location,
         author: author || 'Anonymous',
-        imageUrls: [],
+        images,          // IPFS hashes for cross-device access
+        imageUrls,       // Full IPFS gateway URLs
+        ipfsHash,
       }, {
         timeout: 15000,
       });
@@ -62,6 +67,17 @@ export const submitComplaintToBackend = async ({
       formData.append('category', category);
       formData.append('location', location);
       formData.append('author', author || 'Anonymous');
+
+      // Send IPFS hashes/URLs so backend stores them even without re-uploading files
+      if (images.length > 0) {
+        formData.append('imageHashes', JSON.stringify(images));
+      }
+      if (imageUrls.length > 0) {
+        formData.append('existingImageUrls', JSON.stringify(imageUrls));
+      }
+      if (ipfsHash) {
+        formData.append('ipfsHash', ipfsHash);
+      }
 
       if (imageFiles.length > 0) {
         imageFiles.forEach((file) => formData.append('images', file));
