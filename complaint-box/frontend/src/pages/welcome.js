@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
@@ -123,10 +123,102 @@ function TechBadge({ name, color }) {
   );
 }
 
+/* ──────────────────── Splash Intro ──────────────────── */
+
+function SplashIntro({ onContinue }) {
+  const handleContinue = () => {
+    // Set cookie so middleware won't redirect again
+    document.cookie = 'civic_welcomed=1; path=/; max-age=31536000; SameSite=Lax';
+    onContinue();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a14] text-white overflow-hidden">
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-purple-700/25 blur-[180px] animate-pulse" />
+        <div className="absolute top-0 right-0 h-[350px] w-[350px] rounded-full bg-blue-700/20 blur-[140px]" />
+        <div className="absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-cyan-700/15 blur-[120px]" />
+      </div>
+
+      {/* Decorative grid */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
+      />
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center px-6 text-center">
+        {/* Badge */}
+        <span className="mb-8 inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-5 py-2 text-sm font-medium tracking-wide text-purple-300 backdrop-blur animate-[fadeInDown_0.8s_ease-out]">
+          <RocketOutlined /> Decentralized &amp; Transparent
+        </span>
+
+        {/* Greeting */}
+        <p className="mb-3 text-lg text-gray-400 tracking-wide animate-[fadeIn_1s_ease-out]">
+          Welcome to
+        </p>
+
+        {/* Title */}
+        <h1 className="mb-6 text-5xl font-extrabold leading-tight tracking-tight sm:text-6xl md:text-8xl animate-[fadeIn_1.2s_ease-out]">
+          <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            Civic Complaint Box
+          </span>
+        </h1>
+
+        {/* Subtitle */}
+        <p className="mx-auto mb-12 max-w-xl text-base leading-relaxed text-gray-400 sm:text-lg animate-[fadeIn_1.5s_ease-out]">
+          A citizen-powered platform on{' '}
+          <span className="text-purple-300 font-medium">Solana</span> blockchain to
+          report civic issues, upvote community problems, and track resolutions
+          with full transparency.
+        </p>
+
+        {/* CTA Button */}
+        <button
+          onClick={handleContinue}
+          className="group relative rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 px-10 py-4 text-lg font-semibold text-white shadow-xl shadow-purple-600/30 transition-all duration-300 hover:shadow-purple-600/50 hover:scale-[1.04] animate-[fadeInUp_1.8s_ease-out]"
+        >
+          <span className="flex items-center gap-2">
+            Click to Explore
+            <ArrowRightOutlined className="transition-transform duration-300 group-hover:translate-x-1" />
+          </span>
+        </button>
+
+        {/* Tiny hint */}
+        <p className="mt-6 text-xs text-gray-600 animate-[fadeIn_2.5s_ease-out]">
+          Powered by Solana &bull; IPFS &bull; Next.js
+        </p>
+      </div>
+
+      {/* Keyframe styles */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateY(-20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 /* ──────────────────── Main Page ──────────────────── */
 
 export default function WelcomePage() {
   const router = useRouter();
+  const [showSplash, setShowSplash] = useState(true);
 
   return (
     <>
@@ -138,6 +230,11 @@ export default function WelcomePage() {
         />
       </Head>
 
+      {/* ─── Full-screen Splash Intro ─── */}
+      {showSplash && <SplashIntro onContinue={() => setShowSplash(false)} />}
+
+      {/* ─── Main landing content (visible after splash) ─── */}
+      {!showSplash && (
       <div className="min-h-screen bg-[#0a0a14] text-white overflow-x-hidden">
         {/* ─── Ambient background blobs ─── */}
         <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
@@ -280,6 +377,7 @@ export default function WelcomePage() {
           © {new Date().getFullYear()} Civic Complaint Box — Decentralized &amp; Transparent
         </footer>
       </div>
+      )}
     </>
   );
 }
